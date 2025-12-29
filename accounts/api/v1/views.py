@@ -19,11 +19,18 @@ from .serializers import (
     ResetPasswordSerializerConfirm,
     ResetPasswordSerializer,
 )
-from accounts.models import Profile, EmailVerificationToken, PasswordResetToken
+from accounts.models import (
+    Profile,
+    EmailVerificationToken,
+    PasswordResetToken,
+)
 
 from rest_framework.authtoken.models import Token
 import logging
+from django.conf import settings
+
 logger = logging.getLogger(__name__)
+
 
 class RegisterView(generics.CreateAPIView):
     # User Registration View
@@ -43,7 +50,7 @@ class RegisterView(generics.CreateAPIView):
             email_obj = EmailMessage(
                 "email/Activation.tpl",
                 {"token": verification_token.token},
-                "noreply@qoldo.com",
+                settings.EMAIL_HOST_USER,
                 to=[email],
             )
             EmailThread(email_obj).start()
@@ -171,7 +178,7 @@ class ResendActivationEmailView(generics.GenericAPIView):
         email_obj = EmailMessage(
             "email/Activation.tpl",
             {"token": verification_token.token},
-            "noreply@qoldo.com",
+            settings.EMAIL_HOST_USER,
             to=[user_obj.email],
         )
         EmailThread(email_obj).start()
@@ -192,7 +199,7 @@ class ResetPasswordView(generics.GenericAPIView):
         email_obj = EmailMessage(
             "email/ResetPass.tpl",
             {"token": reset_token.token},
-            "noreply@qoldo.com",
+            settings.EMAIL_HOST_USER,
             to=[user_obj.email],
         )
         EmailThread(email_obj).start()
@@ -236,7 +243,3 @@ class ResetPasswordConfirmView(generics.GenericAPIView):
                 {"message": "Password reset successfully."}, status=status.HTTP_200_OK
             )
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-
-
-def test(x, y, z):
-    return x + y + z

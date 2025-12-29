@@ -1,6 +1,9 @@
 Django
+django-cors-headers
+Pillow
 python-dotenv
 djangorestframework
 djangorestframework-simplejwt
 django-mail-templated
 python-decouple
+djoser

@@ -1,14 +1,12 @@
 from django.urls import path
 from .. import views
 from rest_framework_simplejwt.views import (
-    TokenObtainPairView,
     TokenRefreshView,
     TokenVerifyView,
 )
 urlpatterns = [
     # register API
     path("register/", views.RegisterView.as_view(), name="register"),
-    path("token/login/", views.CustomToken.as_view(), name="token-login"),
     # token
     path("token/logout/", views.LogoutView.as_view(), name="token-logout"),
     # password change API
@@ -40,5 +38,4 @@ urlpatterns = [
         views.ResendActivationEmailView.as_view(),
         name="resend-activation",
     ),
-    # test mail
 ]

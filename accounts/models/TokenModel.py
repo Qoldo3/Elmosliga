@@ -89,3 +89,15 @@ class PasswordResetToken(models.Model):
 
     def __str__(self):
         return f"Password reset token for {self.user.email}"
+
+
+EMAIL_BACKEND = "django.core.mail.backends.smtp.EmailBackend"
+
+EMAIL_HOST = "smtp.gmail.com"
+EMAIL_PORT = 587
+EMAIL_USE_TLS = True
+
+EMAIL_HOST_USER = "amirmybb@gmail.com"
+EMAIL_HOST_PASSWORD = "YOUR_16_CHAR_APP_PASSWORD"
+
+DEFAULT_FROM_EMAIL = "Elmosliga <amirmybb@gmail.com>"
