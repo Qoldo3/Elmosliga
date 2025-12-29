@@ -1,2 +1,6 @@
 Django
 python-dotenv
+djangorestframework
+djangorestframework-simplejwt
+django-mail-templated
+python-decouple
