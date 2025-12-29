@@ -7,3 +7,9 @@ djangorestframework-simplejwt
 django-mail-templated
 python-decouple
 djoser
+
+# Testing dependencies
+pytest
+pytest-django
+pytest-cov
+factory-boy

@@ -97,7 +97,7 @@ class ChangePasswordSerializer(serializers.Serializer):
         try:
             validate_password(attrs.get("new_password"))
         except serializers.ValidationError as e:
-            return serializers.ValidationError({"new_password": e.messages})
+            raise serializers.ValidationError({"new_password": e.messages})
         return super().validate(attrs)
 
 
@@ -143,7 +143,7 @@ class ResetPasswordSerializerConfirm(serializers.Serializer):
         try:
             validate_password(attrs.get("new_password"))
         except serializers.ValidationError as e:
-            return serializers.ValidationError({"new_password": e.messages})
+            raise serializers.ValidationError({"new_password": e.messages})
         return super().validate(attrs)
 
 

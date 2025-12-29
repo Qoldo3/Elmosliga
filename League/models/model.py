@@ -7,6 +7,10 @@ class League(models.Model):
     name = models.CharField(max_length=100)
     image = models.ImageField(upload_to="leagues/", blank=True, null=True)
     is_active = models.BooleanField(default=True)
+    # Points awarded for correct first place prediction
+    first_place_points = models.IntegerField(default=10)
+    second_place_points = models.IntegerField(default=5)
+    third_place_points = models.IntegerField(default=3)
 
     def __str__(self):
         return self.name
@@ -33,17 +37,17 @@ class LeagueResult(models.Model):
     )
     first_place = models.ForeignKey(
         Team,
-        related_name="+",
+        related_name="first_place_results",
         on_delete=models.CASCADE
     )
     second_place = models.ForeignKey(
         Team,
-        related_name="+",
+        related_name="second_place_results",
         on_delete=models.CASCADE
     )
     third_place = models.ForeignKey(
         Team,
-        related_name="+",
+        related_name="third_place_results",
         on_delete=models.CASCADE
     )
     updated_at = models.DateTimeField(auto_now=True)
@@ -53,24 +57,20 @@ class LeagueResult(models.Model):
         teams = [self.first_place, self.second_place, self.third_place]
         for team in teams:
             if team.league != self.league:
-                raise ValidationError("All teams must belong to the same league.")
+                raise ValidationError(
+                    f"Team {team.name} must belong to {self.league.name}"
+                )
+        
+        # Ensure all teams are different
+        if len(set(teams)) != 3:
+            raise ValidationError("All three teams must be different")
+
+    def save(self, *args, **kwargs):
+        self.full_clean()
+        super().save(*args, **kwargs)
 
     def __str__(self):
         return f"Result - {self.league.name}"
-
-    def calculate_points(self):
-        """
-        Assign points to all predictions of this league.
-        Example points: 1st=10, 2nd=5, 3rd=2
-        """
-        points_map = {
-            self.first_place.id: 10,
-            self.second_place.id: 5,
-            self.third_place.id: 2
-        }
-        for prediction in self.league.predictions.all():
-            prediction.points = points_map.get(prediction.first_place_team.id, 0)
-            prediction.save()
 
 
 class Prediction(models.Model):
@@ -84,22 +84,44 @@ class Prediction(models.Model):
         related_name="predictions",
         on_delete=models.CASCADE
     )
-    # Only user selects first-place team
     first_place_team = models.ForeignKey(
         Team,
-        related_name="+",
+        related_name="first_place_predictions",
+        on_delete=models.CASCADE
+    )
+    second_place_team = models.ForeignKey(
+        Team,
+        related_name="second_place_predictions",
+        on_delete=models.CASCADE
+    )
+    third_place_team = models.ForeignKey(
+        Team,
+        related_name="third_place_predictions",
         on_delete=models.CASCADE
     )
     points = models.IntegerField(default=0)
     created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
         unique_together = ("profile", "league")
 
     def clean(self):
-        # Ensure selected team belongs to the selected league
-        if self.first_place_team.league != self.league:
-            raise ValidationError("Selected team must belong to the selected league.")
+        # Ensure all teams belong to the selected league
+        teams = [self.first_place_team, self.second_place_team, self.third_place_team]
+        for team in teams:
+            if team.league != self.league:
+                raise ValidationError(
+                    f"Team {team.name} must belong to {self.league.name}"
+                )
+        
+        # Ensure all teams are different
+        if len(set(teams)) != 3:
+            raise ValidationError("All three predicted teams must be different")
+
+    def save(self, *args, **kwargs):
+        self.full_clean()
+        super().save(*args, **kwargs)
 
     def __str__(self):
-        return f"{self.profile.user.email} - {self.league.name}"
+        return f"{self.profile.user.email} - {self.league.name} ({self.points} pts)"
