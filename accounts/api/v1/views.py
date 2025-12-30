@@ -136,32 +136,33 @@ class ActivateAccountView(APIView):
         try:
             verification_token = EmailVerificationToken.objects.get(token=token)
         except EmailVerificationToken.DoesNotExist:
-            # Redirect to frontend with error status
-            error_params = urlencode({"status": "error", "message": "Activation link has expired."})
-            return redirect(f"{settings.FRONTEND_URL}/activate/{token}?{error_params}")
-        
+            return Response(
+                {"error": "Activation link has expired."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
         if not verification_token.is_valid():
             if verification_token.used:
-                error_params = urlencode({"status": "error", "message": "This activation link has already been used."})
-                return redirect(f"{settings.FRONTEND_URL}/activate/{token}?{error_params}")
+                return Response(
+                    {"error": "This activation link has already been used."},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
             else:
-                error_params = urlencode({"status": "error", "message": "Activation link has expired."})
-                return redirect(f"{settings.FRONTEND_URL}/activate/{token}?{error_params}")
-        
+                return Response(
+                    {"error": "Activation link has expired."},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
         user = verification_token.user
         if user.is_verified:
-            success_params = urlencode({"status": "success", "message": "Account is already activated."})
-            return redirect(f"{settings.FRONTEND_URL}/activate/{token}?{success_params}")
-        
+            return Response(
+                {"message": "Account is already activated."}, status=status.HTTP_200_OK
+            )
         user.is_verified = True
         user.save()
         verification_token.mark_as_used()
 
-        # Redirect to frontend with success status
-        success_params = urlencode({"status": "success", "message": "Account activated successfully."})
-        return redirect(f"{settings.FRONTEND_URL}/activate/{token}?{success_params}")
-
-
+        return Response(
+            {"message": "Account activated successfully."}, status=status.HTTP_200_OK
+        )
 class ResendActivationEmailView(generics.GenericAPIView):
     serializer_class = ResendActivationEmailSerializer
 
