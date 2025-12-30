@@ -164,5 +164,8 @@ DEFAULT_FROM_EMAIL = "Elmosliga <amirmybb@gmail.com>"
 
 CORS_ALLOW_ALL_ORIGINS = True
 
+# Frontend URL for redirects
+FRONTEND_URL = os.getenv("FRONTEND_URL", "http://localhost:5173")
+
 MEDIA_URL = '/media/'
 MEDIA_ROOT = BASE_DIR / 'media'

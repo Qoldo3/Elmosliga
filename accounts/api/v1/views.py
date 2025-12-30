@@ -28,6 +28,8 @@ from accounts.models import (
 from rest_framework.authtoken.models import Token
 import logging
 from django.conf import settings
+from django.shortcuts import redirect
+from urllib.parse import urlencode
 
 logger = logging.getLogger(__name__)
 
@@ -134,33 +136,30 @@ class ActivateAccountView(APIView):
         try:
             verification_token = EmailVerificationToken.objects.get(token=token)
         except EmailVerificationToken.DoesNotExist:
-            return Response(
-                {"error": "Activation link has expired."},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
+            # Redirect to frontend with error status
+            error_params = urlencode({"status": "error", "message": "Activation link has expired."})
+            return redirect(f"{settings.FRONTEND_URL}/activate/{token}?{error_params}")
+        
         if not verification_token.is_valid():
             if verification_token.used:
-                return Response(
-                    {"error": "This activation link has already been used."},
-                    status=status.HTTP_400_BAD_REQUEST,
-                )
+                error_params = urlencode({"status": "error", "message": "This activation link has already been used."})
+                return redirect(f"{settings.FRONTEND_URL}/activate/{token}?{error_params}")
             else:
-                return Response(
-                    {"error": "Activation link has expired."},
-                    status=status.HTTP_400_BAD_REQUEST,
-                )
+                error_params = urlencode({"status": "error", "message": "Activation link has expired."})
+                return redirect(f"{settings.FRONTEND_URL}/activate/{token}?{error_params}")
+        
         user = verification_token.user
         if user.is_verified:
-            return Response(
-                {"message": "Account is already activated."}, status=status.HTTP_200_OK
-            )
+            success_params = urlencode({"status": "success", "message": "Account is already activated."})
+            return redirect(f"{settings.FRONTEND_URL}/activate/{token}?{success_params}")
+        
         user.is_verified = True
         user.save()
         verification_token.mark_as_used()
 
-        return Response(
-            {"message": "Account activated successfully."}, status=status.HTTP_200_OK
-        )
+        # Redirect to frontend with success status
+        success_params = urlencode({"status": "success", "message": "Account activated successfully."})
+        return redirect(f"{settings.FRONTEND_URL}/activate/{token}?{success_params}")
 
 
 class ResendActivationEmailView(generics.GenericAPIView):
@@ -208,7 +207,27 @@ class ResetPasswordView(generics.GenericAPIView):
 class ResetPasswordConfirmView(generics.GenericAPIView):
     serializer_class = ResetPasswordSerializerConfirm
 
+    def get(self, request, token, *args, **kwargs):
+        """Validate token and redirect to frontend password reset page"""
+        try:
+            reset_token = PasswordResetToken.objects.get(token=token)
+        except PasswordResetToken.DoesNotExist:
+            error_params = urlencode({"status": "error", "message": "Invalid password reset token."})
+            return redirect(f"{settings.FRONTEND_URL}/reset-password/{token}?{error_params}")
+
+        if not reset_token.is_valid():
+            if reset_token.used:
+                error_params = urlencode({"status": "error", "message": "This password reset link has already been used."})
+                return redirect(f"{settings.FRONTEND_URL}/reset-password/{token}?{error_params}")
+            else:
+                error_params = urlencode({"status": "error", "message": "Password reset link has expired."})
+                return redirect(f"{settings.FRONTEND_URL}/reset-password/{token}?{error_params}")
+        
+        # Token is valid, redirect to frontend form page
+        return redirect(f"{settings.FRONTEND_URL}/reset-password/{token}")
+
     def post(self, request, token, *args, **kwargs):
+        """Process password reset form submission"""
         # decode JWT token to get user ID and reset password
         try:
             reset_token = PasswordResetToken.objects.get(token=token)
@@ -229,6 +248,7 @@ class ResetPasswordConfirmView(generics.GenericAPIView):
                     {"error": "Password reset link has expired."},
                     status=status.HTTP_400_BAD_REQUEST,
                 )
+        
         user_obj = reset_token.user
         serializer = self.serializer_class(data=request.data)
         if serializer.is_valid():
