@@ -61,3 +61,5 @@ htmlcov/
 node_modules/
 dist/
 build/
+teams.json
+add_teams_and_leagues.py

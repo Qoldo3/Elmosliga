@@ -43,14 +43,19 @@ class PredictionSerializer(serializers.ModelSerializer):
             "predicted_team",
             "predicted_team_name",
             "points",
+            "is_predicted",  # NEW FIELD
             "created_at",
             "updated_at",
         )
-        read_only_fields = ("points", "created_at", "updated_at")
+        read_only_fields = ("points", "is_predicted", "created_at", "updated_at")
 
     def validate(self, attrs):
         league = attrs.get("league")
         predicted_team = attrs.get("predicted_team")
+        
+        # Get the request from context
+        request = self.context.get("request")
+        profile = getattr(request.user, 'profile', None)
 
         if not predicted_team:
             raise serializers.ValidationError("Predicted team is required")
@@ -66,6 +71,25 @@ class PredictionSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError(
                 "Cannot make predictions for inactive leagues"
             )
+        
+        # NEW: Check if user has already predicted for this league
+        if self.instance is None:  # Only for creation
+            existing_prediction = Prediction.objects.filter(
+                profile=profile,
+                league=league,
+                is_predicted=True
+            ).first()
+            
+            if existing_prediction:
+                raise serializers.ValidationError(
+                    "You have already made a prediction for this league and cannot change it."
+                )
+
+        # NEW: For updates, check if already predicted
+        if self.instance and self.instance.is_predicted:
+            raise serializers.ValidationError(
+                "You have already made a prediction for this league and cannot change it."
+            )
 
         return attrs
 
@@ -75,11 +99,16 @@ class PredictionSerializer(serializers.ModelSerializer):
         if not profile:
             from accounts.models import Profile
             profile = Profile.objects.create(user=user)
+        
+        # Mark as predicted when creating
+        validated_data['is_predicted'] = True
+        
         prediction, created = Prediction.objects.update_or_create(
             profile=profile,
             league=validated_data["league"],
             defaults={
                 "predicted_team": validated_data["predicted_team"],
+                "is_predicted": True,
             },
         )
         return prediction

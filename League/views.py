@@ -31,6 +31,30 @@ class TeamListView(generics.ListAPIView):
         return Team.objects.filter(league_id=league_id)
 
 
+class CheckPredictionView(generics.GenericAPIView):
+    """Check if user has already predicted for a league"""
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request, league_id, *args, **kwargs):
+        profile = getattr(request.user, 'profile', None)
+        if not profile:
+            return Response({"has_predicted": False})
+        
+        prediction = Prediction.objects.filter(
+            profile=profile,
+            league_id=league_id,
+            is_predicted=True
+        ).first()
+        
+        if prediction:
+            return Response({
+                "has_predicted": True,
+                "prediction": PredictionSerializer(prediction).data
+            })
+        
+        return Response({"has_predicted": False})
+
+
 class PredictionCreateUpdateView(generics.CreateAPIView, generics.UpdateAPIView):
     """Create or update a prediction for a league"""
     serializer_class = PredictionSerializer
@@ -52,6 +76,15 @@ class PredictionCreateUpdateView(generics.CreateAPIView, generics.UpdateAPIView)
     def post(self, request, *args, **kwargs):
         # Check if prediction already exists
         existing_prediction = self.get_object()
+        
+        # If prediction exists and is already marked as predicted, reject
+        if existing_prediction and existing_prediction.is_predicted:
+            return Response(
+                {
+                    "error": "You have already made a prediction for this league and cannot change it."
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
         
         if existing_prediction:
             # Update existing prediction
@@ -94,6 +127,13 @@ class PredictionListView(generics.ListAPIView):
         )
 
 
+class LeagueResultListView(generics.ListAPIView):
+    """Admin only - List all league results"""
+    queryset = LeagueResult.objects.all().select_related('league')
+    serializer_class = LeagueResultSerializer
+    permission_classes = [permissions.IsAdminUser]
+
+
 class LeagueResultUpdateView(generics.UpdateAPIView):
     """Admin only - Update league results and recalculate all prediction points"""
     queryset = LeagueResult.objects.all()
@@ -107,6 +147,13 @@ class LeagueResultUpdateView(generics.UpdateAPIView):
 
 class LeagueResultCreateView(generics.CreateAPIView):
     """Admin only - Create league result"""
+    queryset = LeagueResult.objects.all()
+    serializer_class = LeagueResultSerializer
+    permission_classes = [permissions.IsAdminUser]
+
+
+class LeagueResultDeleteView(generics.DestroyAPIView):
+    """Admin only - Delete league result"""
     queryset = LeagueResult.objects.all()
     serializer_class = LeagueResultSerializer
     permission_classes = [permissions.IsAdminUser]
