@@ -8,8 +8,10 @@ from .serializers import (
     PredictionSerializer,
     LeagueResultSerializer,
 )
-from django.db.models import Sum, F
+from django.db.models import Sum, F, Value
+from django.db.models.functions import Coalesce
 from accounts.models import Profile
+from django.shortcuts import get_object_or_404
 
 
 class LeagueListView(generics.ListAPIView):
@@ -29,22 +31,49 @@ class TeamListView(generics.ListAPIView):
         return Team.objects.filter(league_id=league_id)
 
 
-class PredictionCreateUpdateView(generics.CreateAPIView):
+class PredictionCreateUpdateView(generics.CreateAPIView, generics.UpdateAPIView):
     """Create or update a prediction for a league"""
     serializer_class = PredictionSerializer
     permission_classes = [permissions.IsAuthenticated]
 
+    def get_object(self):
+        """Get existing prediction for the user and league if it exists"""
+        profile = getattr(self.request.user, 'profile', None)
+        if not profile:
+            return None
+        try:
+            return Prediction.objects.get(
+                profile=profile,
+                league_id=self.request.data.get('league')
+            )
+        except (Prediction.DoesNotExist, KeyError):
+            return None
+
     def post(self, request, *args, **kwargs):
-        serializer = self.get_serializer(data=request.data)
-        serializer.is_valid(raise_exception=True)
-        prediction = serializer.save()
+        # Check if prediction already exists
+        existing_prediction = self.get_object()
+        
+        if existing_prediction:
+            # Update existing prediction
+            serializer = self.get_serializer(existing_prediction, data=request.data)
+            serializer.is_valid(raise_exception=True)
+            prediction = serializer.save()
+            status_code = status.HTTP_200_OK
+            message = "Prediction updated successfully"
+        else:
+            # Create new prediction
+            serializer = self.get_serializer(data=request.data)
+            serializer.is_valid(raise_exception=True)
+            prediction = serializer.save()
+            status_code = status.HTTP_201_CREATED
+            message = "Prediction saved successfully"
         
         return Response(
             {
-                "message": "Prediction saved successfully",
+                "message": message,
                 "prediction": PredictionSerializer(prediction).data,
             },
-            status=status.HTTP_201_CREATED,
+            status=status_code,
         )
 
 
@@ -54,13 +83,14 @@ class PredictionListView(generics.ListAPIView):
     permission_classes = [permissions.IsAuthenticated]
 
     def get_queryset(self):
+        profile = getattr(self.request.user, 'profile', None)
+        if not profile:
+            return Prediction.objects.none()
         return Prediction.objects.filter(
-            profile=self.request.user.profile
+            profile=profile
         ).select_related(
             "league",
-            "first_place_team",
-            "second_place_team",
-            "third_place_team",
+            "predicted_team",
         )
 
 
@@ -88,7 +118,10 @@ class LeaderboardView(generics.ListAPIView):
 
     def get(self, request, *args, **kwargs):
         leaderboard = (
-            Profile.objects.annotate(total_points=Sum("predictions__points"))
+            Profile.objects.select_related("user")
+            .annotate(
+                total_points=Coalesce(Sum("predictions__points"), Value(0))
+            )
             .order_by("-total_points")
             .values(
                 "id",
@@ -104,9 +137,6 @@ class LeaderboardView(generics.ListAPIView):
         leaderboard_list = list(leaderboard)
         for idx, entry in enumerate(leaderboard_list, start=1):
             entry["rank"] = idx
-            # Handle None values
-            if entry["total_points"] is None:
-                entry["total_points"] = 0
         
         return Response(leaderboard_list)
 
@@ -118,7 +148,10 @@ class LeagueLeaderboardView(generics.ListAPIView):
     def get(self, request, league_id, *args, **kwargs):
         predictions = (
             Prediction.objects.filter(league_id=league_id)
-            .select_related("profile__user")
+            .select_related(
+                "profile__user",
+                "predicted_team"
+            )
             .order_by("-points")
             .values(
                 "profile__id",
@@ -126,9 +159,7 @@ class LeagueLeaderboardView(generics.ListAPIView):
                 "profile__first_name",
                 "profile__last_name",
                 "points",
-                "first_place_team__name",
-                "second_place_team__name",
-                "third_place_team__name",
+                "predicted_team__name",
             )
         )
         

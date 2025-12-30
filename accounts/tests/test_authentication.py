@@ -9,14 +9,14 @@ from accounts.models import EmailVerificationToken, PasswordResetToken
 
 User = get_user_model()
 
-
+@pytest.mark.django_db
 @pytest.mark.auth
 class TestUserRegistration:
     """Test user registration"""
 
     def test_register_user_success(self, api_client, db):
         """Test successful user registration"""
-        url = reverse("accounts-v1:register")
+        url = 'http://127.0.0.1:8000/accounts/api/v1/register/'
         data = {
             "email": "newuser@example.com",
             "password": "StrongPass123!",
@@ -37,7 +37,7 @@ class TestUserRegistration:
 
     def test_register_user_password_mismatch(self, api_client, db):
         """Test registration with mismatched passwords"""
-        url = reverse("accounts-v1:register")
+        url = 'http://127.0.0.1:8000/accounts/api/v1/register/'
         data = {
             "email": "newuser@example.com",
             "password": "StrongPass123!",
@@ -50,7 +50,7 @@ class TestUserRegistration:
 
     def test_register_user_weak_password(self, api_client, db):
         """Test registration with weak password"""
-        url = reverse("accounts-v1:register")
+        url = 'http://127.0.0.1:8000/accounts/api/v1/register/'
         data = {
             "email": "newuser@example.com",
             "password": "123",
@@ -63,7 +63,7 @@ class TestUserRegistration:
 
     def test_register_duplicate_email(self, api_client, user):
         """Test registration with existing email"""
-        url = reverse("accounts-v1:register")
+        url = 'http://127.0.0.1:8000/accounts/api/v1/register/'
         data = {
             "email": user.email,
             "password": "StrongPass123!",
@@ -74,6 +74,7 @@ class TestUserRegistration:
         assert response.status_code == status.HTTP_400_BAD_REQUEST
 
 
+@pytest.mark.django_db
 @pytest.mark.auth
 class TestAccountActivation:
     """Test account activation"""
@@ -114,6 +115,7 @@ class TestAccountActivation:
         assert "already activated" in response.data["message"].lower()
 
 
+@pytest.mark.django_db
 @pytest.mark.auth
 class TestJWTAuthentication:
     """Test JWT token authentication"""
@@ -153,7 +155,8 @@ class TestJWTAuthentication:
         }
         response = api_client.post(url, data)
         
-        assert response.status_code == status.HTTP_400_BAD_REQUEST
+        # JWT returns 401 Unauthorized for wrong credentials (not 400)
+        assert response.status_code == status.HTTP_401_UNAUTHORIZED
 
     def test_jwt_refresh_token(self, api_client, user):
         """Test JWT refresh token"""
@@ -175,6 +178,7 @@ class TestJWTAuthentication:
         assert "access" in response.data
 
 
+@pytest.mark.django_db
 @pytest.mark.auth
 class TestPasswordManagement:
     """Test password change and reset"""
@@ -238,6 +242,7 @@ class TestPasswordManagement:
         assert user.check_password("NewResetPass123!")
 
 
+@pytest.mark.django_db
 @pytest.mark.auth
 class TestProfile:
     """Test user profile operations"""

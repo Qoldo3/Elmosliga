@@ -4,6 +4,7 @@ from rest_framework_simplejwt.views import (
     TokenRefreshView,
     TokenVerifyView,
 )
+
 urlpatterns = [
     # register API
     path("register/", views.RegisterView.as_view(), name="register"),

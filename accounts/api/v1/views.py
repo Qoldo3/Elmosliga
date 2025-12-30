@@ -42,10 +42,6 @@ class RegisterView(generics.CreateAPIView):
             user = serializer.save()
             verification_token = EmailVerificationToken.create_token(user)
             email = serializer.validated_data["email"]
-            data = {
-                "email": email,
-            }
-            user_obj = get_object_or_404(get_user_model(), email=email)
 
             email_obj = EmailMessage(
                 "email/Activation.tpl",

@@ -125,7 +125,7 @@ class ResendActivationEmailSerializer(serializers.Serializer):
         email = attrs.get("email")
         try:
             user_obj = get_object_or_404(get_user_model(), email=email)
-        except:
+        except Exception:
             raise serializers.ValidationError("User with this email does not exist.")
         if user_obj.is_verified:
             raise serializers.ValidationError("Account is already verified.")
@@ -154,7 +154,7 @@ class ResetPasswordSerializer(serializers.Serializer):
         email = attrs.get("email")
         try:
             user_obj = get_object_or_404(get_user_model(), email=email)
-        except:
+        except Exception:
             raise serializers.ValidationError("User with this email does not exist.")
         attrs["user"] = user_obj
         return super().validate(attrs)

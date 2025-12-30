@@ -5,8 +5,18 @@ from League.services.scoring import calculate_points
 
 @receiver(post_save, sender=LeagueResult)
 def recalculate_points(sender, instance, **kwargs):
-    predictions = Prediction.objects.filter(league=instance.league)
+    """
+    Recalculate points for all predictions when league result is saved.
+    Uses bulk_update for better performance.
+    """
+    predictions = Prediction.objects.filter(league=instance.league).select_related(
+        'predicted_team'
+    )
 
+    predictions_to_update = []
     for prediction in predictions:
         prediction.points = calculate_points(prediction, instance)
-        prediction.save(update_fields=["points"])
+        predictions_to_update.append(prediction)
+    
+    if predictions_to_update:
+        Prediction.objects.bulk_update(predictions_to_update, ['points'])

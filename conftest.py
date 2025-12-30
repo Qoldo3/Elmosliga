@@ -94,9 +94,12 @@ def league(db):
     return League.objects.create(
         name="Premier League",
         is_active=True,
-        first_place_points=10,
-        second_place_points=5,
-        third_place_points=3
+        first_place_points=20,
+        second_place_points=15,
+        third_place_points=10,
+        fourth_place_points=7,
+        fifth_place_points=5,
+        sixth_place_points=3
     )
 
 
@@ -106,9 +109,12 @@ def league_with_custom_points(db):
     return League.objects.create(
         name="Champions League",
         is_active=True,
-        first_place_points=20,
-        second_place_points=10,
-        third_place_points=5
+        first_place_points=30,
+        second_place_points=20,
+        third_place_points=15,
+        fourth_place_points=10,
+        fifth_place_points=7,
+        sixth_place_points=5
     )
 
 
@@ -118,16 +124,19 @@ def inactive_league(db):
     return League.objects.create(
         name="Inactive League",
         is_active=False,
-        first_place_points=10,
-        second_place_points=5,
-        third_place_points=3
+        first_place_points=20,
+        second_place_points=15,
+        third_place_points=10,
+        fourth_place_points=7,
+        fifth_place_points=5,
+        sixth_place_points=3
     )
 
 
 @pytest.fixture
 def teams(db, league):
-    """Create 5 teams for a league"""
-    team_names = ["Team A", "Team B", "Team C", "Team D", "Team E"]
+    """Create 6 teams for a league (needed for 1st-6th place results)"""
+    team_names = ["Team A", "Team B", "Team C", "Team D", "Team E", "Team F"]
     return [
         Team.objects.create(name=name, league=league)
         for name in team_names
@@ -155,13 +164,11 @@ def team_c(teams):
 
 @pytest.fixture
 def prediction(db, user_profile, league, teams):
-    """Create a prediction"""
+    """Create a prediction (user predicts one team)"""
     return Prediction.objects.create(
         profile=user_profile,
         league=league,
-        first_place_team=teams[0],
-        second_place_team=teams[1],
-        third_place_team=teams[2],
+        predicted_team=teams[0],
     )
 
 
@@ -171,17 +178,13 @@ def multiple_predictions(db, user_profile, second_user, league, teams):
     pred1 = Prediction.objects.create(
         profile=user_profile,
         league=league,
-        first_place_team=teams[0],
-        second_place_team=teams[1],
-        third_place_team=teams[2],
+        predicted_team=teams[0],
     )
     
     pred2 = Prediction.objects.create(
         profile=second_user.profile,
         league=league,
-        first_place_team=teams[1],
-        second_place_team=teams[0],
-        third_place_team=teams[2],
+        predicted_team=teams[1],
     )
     
     return [pred1, pred2]
@@ -193,12 +196,15 @@ def multiple_predictions(db, user_profile, second_user, league, teams):
 
 @pytest.fixture
 def league_result(db, league, teams):
-    """Create a league result"""
+    """Create a league result with 1st-6th place"""
     return LeagueResult.objects.create(
         league=league,
         first_place=teams[0],
         second_place=teams[1],
         third_place=teams[2],
+        fourth_place=teams[3],
+        fifth_place=teams[4],
+        sixth_place=teams[5],
     )
 
 

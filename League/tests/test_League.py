@@ -16,31 +16,43 @@ class TestLeagueModel:
         league = League.objects.create(
             name="Test League",
             is_active=True,
-            first_place_points=15,
-            second_place_points=8,
-            third_place_points=4,
+            first_place_points=25,
+            second_place_points=18,
+            third_place_points=12,
+            fourth_place_points=8,
+            fifth_place_points=5,
+            sixth_place_points=3,
         )
         
         assert league.name == "Test League"
         assert league.is_active is True
-        assert league.first_place_points == 15
-        assert league.second_place_points == 8
-        assert league.third_place_points == 4
+        assert league.first_place_points == 25
+        assert league.second_place_points == 18
+        assert league.third_place_points == 12
+        assert league.fourth_place_points == 8
+        assert league.fifth_place_points == 5
+        assert league.sixth_place_points == 3
         assert str(league) == "Test League"
 
     def test_league_default_points(self, db):
         """Test league with default points"""
         league = League.objects.create(name="Default League")
         
-        assert league.first_place_points == 10
-        assert league.second_place_points == 5
-        assert league.third_place_points == 3
+        assert league.first_place_points == 20
+        assert league.second_place_points == 15
+        assert league.third_place_points == 10
+        assert league.fourth_place_points == 7
+        assert league.fifth_place_points == 5
+        assert league.sixth_place_points == 3
 
     def test_league_custom_points(self, league_with_custom_points):
         """Test league with custom points"""
-        assert league_with_custom_points.first_place_points == 20
-        assert league_with_custom_points.second_place_points == 10
-        assert league_with_custom_points.third_place_points == 5
+        assert league_with_custom_points.first_place_points == 30
+        assert league_with_custom_points.second_place_points == 20
+        assert league_with_custom_points.third_place_points == 15
+        assert league_with_custom_points.fourth_place_points == 10
+        assert league_with_custom_points.fifth_place_points == 7
+        assert league_with_custom_points.sixth_place_points == 5
 
 
 @pytest.mark.unit
@@ -61,7 +73,7 @@ class TestTeamModel:
 
     def test_team_league_relationship(self, league, teams):
         """Test team-league relationship"""
-        assert league.teams.count() == 5
+        assert league.teams.count() == 6
         assert all(team.league == league for team in teams)
 
 
@@ -71,20 +83,16 @@ class TestPredictionModel:
     """Test Prediction model"""
 
     def test_create_prediction(self, user_profile, league, teams):
-        """Test creating a prediction"""
+        """Test creating a prediction (user predicts one team)"""
         prediction = Prediction.objects.create(
             profile=user_profile,
             league=league,
-            first_place_team=teams[0],
-            second_place_team=teams[1],
-            third_place_team=teams[2],
+            predicted_team=teams[0],
         )
         
         assert prediction.profile == user_profile
         assert prediction.league == league
-        assert prediction.first_place_team == teams[0]
-        assert prediction.second_place_team == teams[1]
-        assert prediction.third_place_team == teams[2]
+        assert prediction.predicted_team == teams[0]
         assert prediction.points == 0  # Default
 
     def test_prediction_unique_together(self, user_profile, league, teams):
@@ -92,9 +100,7 @@ class TestPredictionModel:
         Prediction.objects.create(
             profile=user_profile,
             league=league,
-            first_place_team=teams[0],
-            second_place_team=teams[1],
-            third_place_team=teams[2],
+            predicted_team=teams[0],
         )
         
         # Try to create another prediction for same user and league
@@ -102,40 +108,21 @@ class TestPredictionModel:
             Prediction.objects.create(
                 profile=user_profile,
                 league=league,
-                first_place_team=teams[1],
-                second_place_team=teams[0],
-                third_place_team=teams[2],
+                predicted_team=teams[1],
             )
 
-    def test_prediction_teams_must_be_from_league(self, user_profile, league, db):
-        """Test validation: teams must belong to the league"""
+    def test_prediction_team_must_be_from_league(self, user_profile, league, db):
+        """Test validation: predicted team must belong to the league"""
         # Create team from different league
         other_league = League.objects.create(name="Other League")
         other_team = Team.objects.create(name="Other Team", league=other_league)
-        
-        team_a = Team.objects.create(name="Team A", league=league)
-        team_b = Team.objects.create(name="Team B", league=league)
         
         # Try to create prediction with team from wrong league
         with pytest.raises(ValidationError):
             prediction = Prediction(
                 profile=user_profile,
                 league=league,
-                first_place_team=other_team,  # Wrong league!
-                second_place_team=team_a,
-                third_place_team=team_b,
-            )
-            prediction.save()
-
-    def test_prediction_teams_must_be_different(self, user_profile, league, teams):
-        """Test validation: all three teams must be different"""
-        with pytest.raises(ValidationError):
-            prediction = Prediction(
-                profile=user_profile,
-                league=league,
-                first_place_team=teams[0],
-                second_place_team=teams[0],  # Same as first!
-                third_place_team=teams[2],
+                predicted_team=other_team,  # Wrong league!
             )
             prediction.save()
 
@@ -151,18 +138,24 @@ class TestLeagueResultModel:
     """Test LeagueResult model"""
 
     def test_create_league_result(self, league, teams):
-        """Test creating a league result"""
+        """Test creating a league result with 1st-6th place"""
         result = LeagueResult.objects.create(
             league=league,
             first_place=teams[0],
             second_place=teams[1],
             third_place=teams[2],
+            fourth_place=teams[3],
+            fifth_place=teams[4],
+            sixth_place=teams[5],
         )
         
         assert result.league == league
         assert result.first_place == teams[0]
         assert result.second_place == teams[1]
         assert result.third_place == teams[2]
+        assert result.fourth_place == teams[3]
+        assert result.fifth_place == teams[4]
+        assert result.sixth_place == teams[5]
 
     def test_league_result_one_per_league(self, league, teams):
         """Test that each league can only have one result"""
@@ -171,6 +164,9 @@ class TestLeagueResultModel:
             first_place=teams[0],
             second_place=teams[1],
             third_place=teams[2],
+            fourth_place=teams[3],
+            fifth_place=teams[4],
+            sixth_place=teams[5],
         )
         
         # Try to create another result for same league
@@ -180,6 +176,9 @@ class TestLeagueResultModel:
                 first_place=teams[1],
                 second_place=teams[0],
                 third_place=teams[2],
+                fourth_place=teams[3],
+                fifth_place=teams[4],
+                sixth_place=teams[5],
             )
 
     def test_league_result_teams_must_be_from_league(self, league, db):
@@ -187,26 +186,34 @@ class TestLeagueResultModel:
         other_league = League.objects.create(name="Other League")
         other_team = Team.objects.create(name="Other Team", league=other_league)
         
-        team_a = Team.objects.create(name="Team A", league=league)
-        team_b = Team.objects.create(name="Team B", league=league)
+        teams = [
+            Team.objects.create(name=f"Team {i}", league=league)
+            for i in range(6)
+        ]
         
         with pytest.raises(ValidationError):
             result = LeagueResult(
                 league=league,
                 first_place=other_team,  # Wrong league!
-                second_place=team_a,
-                third_place=team_b,
+                second_place=teams[1],
+                third_place=teams[2],
+                fourth_place=teams[3],
+                fifth_place=teams[4],
+                sixth_place=teams[5],
             )
             result.save()
 
     def test_league_result_teams_must_be_different(self, league, teams):
-        """Test validation: all three result teams must be different"""
+        """Test validation: all six result teams must be different"""
         with pytest.raises(ValidationError):
             result = LeagueResult(
                 league=league,
                 first_place=teams[0],
                 second_place=teams[0],  # Same as first!
                 third_place=teams[2],
+                fourth_place=teams[3],
+                fifth_place=teams[4],
+                sixth_place=teams[5],
             )
             result.save()
 

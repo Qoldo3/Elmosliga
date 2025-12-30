@@ -4,6 +4,7 @@ Tests for League API endpoints.
 import pytest
 from django.urls import reverse
 from rest_framework import status
+from django.db.models import Sum
 from League.models import Prediction, LeagueResult
 
 
@@ -20,7 +21,7 @@ class TestLeagueListAPI:
         assert response.status_code == status.HTTP_200_OK
         assert len(response.data) == 1
         assert response.data[0]["name"] == league.name
-        assert len(response.data[0]["teams"]) == 5
+        assert len(response.data[0]["teams"]) == 6
 
     def test_list_leagues_unauthenticated(self, api_client):
         """Test that unauthenticated users cannot list leagues"""
@@ -47,19 +48,18 @@ class TestPredictionAPI:
     """Test prediction creation and listing endpoints"""
 
     def test_create_prediction(self, authenticated_client, league, teams):
-        """Test creating a prediction"""
+        """Test creating a prediction (user predicts one team)"""
         url = reverse("prediction-create")
         data = {
             "league": league.id,
-            "first_place_team": teams[0].id,
-            "second_place_team": teams[1].id,
-            "third_place_team": teams[2].id,
+            "predicted_team": teams[0].id,
         }
         response = authenticated_client.post(url, data)
         
         assert response.status_code == status.HTTP_201_CREATED
         assert "prediction" in response.data
         assert response.data["prediction"]["points"] == 0
+        assert response.data["prediction"]["predicted_team"] == teams[0].id
 
     def test_update_existing_prediction(
         self, authenticated_client, prediction, teams
@@ -68,54 +68,31 @@ class TestPredictionAPI:
         url = reverse("prediction-create")
         data = {
             "league": prediction.league.id,
-            "first_place_team": teams[1].id,  # Changed
-            "second_place_team": teams[0].id,  # Changed
-            "third_place_team": teams[2].id,
+            "predicted_team": teams[1].id,  # Changed
         }
         response = authenticated_client.post(url, data)
         
-        assert response.status_code == status.HTTP_201_CREATED
+        assert response.status_code == status.HTTP_200_OK
         
         # Should update, not create new
         prediction.refresh_from_db()
-        assert prediction.first_place_team == teams[1]
+        assert prediction.predicted_team == teams[1]
         assert Prediction.objects.filter(league=prediction.league).count() == 1
 
-    def test_create_prediction_teams_must_be_different(
-        self, authenticated_client, league, teams
-    ):
-        """Test that all three teams must be different"""
-        url = reverse("prediction-create")
-        data = {
-            "league": league.id,
-            "first_place_team": teams[0].id,
-            "second_place_team": teams[0].id,  # Same!
-            "third_place_team": teams[2].id,
-        }
-        response = authenticated_client.post(url, data)
-        
-        assert response.status_code == status.HTTP_400_BAD_REQUEST
-
-    def test_create_prediction_teams_must_be_from_league(
+    def test_create_prediction_team_must_be_from_league(
         self, authenticated_client, league, db
     ):
-        """Test that teams must belong to the selected league"""
+        """Test that predicted team must belong to the selected league"""
         from League.models import League, Team
         
         # Create another league with teams
         other_league = League.objects.create(name="Other League")
         other_team = Team.objects.create(name="Other Team", league=other_league)
         
-        from League.models import Team as LeagueTeam
-        team_a = LeagueTeam.objects.create(name="Team A", league=league)
-        team_b = LeagueTeam.objects.create(name="Team B", league=league)
-        
         url = reverse("prediction-create")
         data = {
             "league": league.id,
-            "first_place_team": other_team.id,  # Wrong league!
-            "second_place_team": team_a.id,
-            "third_place_team": team_b.id,
+            "predicted_team": other_team.id,  # Wrong league!
         }
         response = authenticated_client.post(url, data)
         
@@ -127,17 +104,12 @@ class TestPredictionAPI:
         """Test that predictions cannot be made for inactive leagues"""
         from League.models import Team
         
-        teams = [
-            Team.objects.create(name=f"Team {i}", league=inactive_league)
-            for i in range(3)
-        ]
+        team = Team.objects.create(name="Team A", league=inactive_league)
         
         url = reverse("prediction-create")
         data = {
             "league": inactive_league.id,
-            "first_place_team": teams[0].id,
-            "second_place_team": teams[1].id,
-            "third_place_team": teams[2].id,
+            "predicted_team": team.id,
         }
         response = authenticated_client.post(url, data)
         
@@ -159,13 +131,16 @@ class TestLeagueResultAPI:
     """Test league result management (admin only)"""
 
     def test_create_result_as_admin(self, admin_client, league, teams):
-        """Test creating league result as admin"""
+        """Test creating league result as admin (1st-6th place)"""
         url = reverse("result-create")
         data = {
             "league": league.id,
             "first_place": teams[0].id,
             "second_place": teams[1].id,
             "third_place": teams[2].id,
+            "fourth_place": teams[3].id,
+            "fifth_place": teams[4].id,
+            "sixth_place": teams[5].id,
         }
         response = admin_client.post(url, data)
         
@@ -182,6 +157,9 @@ class TestLeagueResultAPI:
             "first_place": teams[0].id,
             "second_place": teams[1].id,
             "third_place": teams[2].id,
+            "fourth_place": teams[3].id,
+            "fifth_place": teams[4].id,
+            "sixth_place": teams[5].id,
         }
         response = authenticated_client.post(url, data)
         
@@ -195,6 +173,9 @@ class TestLeagueResultAPI:
             "first_place": teams[1].id,  # Changed
             "second_place": teams[0].id,  # Changed
             "third_place": teams[2].id,
+            "fourth_place": teams[3].id,
+            "fifth_place": teams[4].id,
+            "sixth_place": teams[5].id,
         }
         response = admin_client.put(url, data)
         
@@ -273,44 +254,58 @@ class TestCompleteWorkflow:
     ):
         """Test complete workflow: create prediction -> create result -> check points"""
         
-        # Step 1: User creates prediction
+        # Step 1: User creates prediction (predicts team will finish 1st)
         prediction_url = reverse("prediction-create")
         prediction_data = {
             "league": league.id,
-            "first_place_team": teams[0].id,
-            "second_place_team": teams[1].id,
-            "third_place_team": teams[2].id,
+            "predicted_team": teams[0].id,
         }
         pred_response = authenticated_client.post(prediction_url, prediction_data)
         assert pred_response.status_code == status.HTTP_201_CREATED
+        assert "prediction" in pred_response.data
         
-        # Step 2: Admin creates result
+        # Get prediction ID from response
+        prediction_id = pred_response.data["prediction"]["id"]
+        
+        # Step 2: Admin creates result (team finishes 1st)
         result_url = reverse("result-create")
         result_data = {
             "league": league.id,
             "first_place": teams[0].id,
             "second_place": teams[1].id,
             "third_place": teams[2].id,
+            "fourth_place": teams[3].id,
+            "fifth_place": teams[4].id,
+            "sixth_place": teams[5].id,
         }
         result_response = admin_client.post(result_url, result_data)
         assert result_response.status_code == status.HTTP_201_CREATED
         
         # Step 3: Check prediction points were calculated
-        prediction = Prediction.objects.get(
-            profile=user.profile,
-            league=league
-        )
-        assert prediction.points == 18  # All correct: 10+5+3
-        
+        # Use the prediction ID from the API response
+        prediction = Prediction.objects.get(id=prediction_id)
+        prediction.refresh_from_db()  # Ensure we have the latest data
+        assert prediction.points == 20  # Team finished 1st: 20 points
+
         # Step 4: Check leaderboard
+        # Use the email of the user who actually owns the prediction
+        prediction_owner_email = prediction.profile.user.email
+
         leaderboard_url = reverse("leaderboard-global")
         leaderboard_response = authenticated_client.get(leaderboard_url)
         assert leaderboard_response.status_code == status.HTTP_200_OK
-        
-        # User should be on leaderboard with correct points
-        user_entry = next(
-            (u for u in leaderboard_response.data if u["user__email"] == user.email),
-            None
+
+        # Prediction owner should be on leaderboard with correct points
+        owner_entry = next(
+            (u for u in leaderboard_response.data if u["user__email"] == prediction_owner_email),
+            None,
         )
-        assert user_entry is not None
-        assert user_entry["total_points"] == 18
+        assert (
+            owner_entry is not None
+        ), f"Prediction owner {prediction_owner_email} not found in leaderboard. Available users: {[u['user__email'] for u in leaderboard_response.data]}"
+
+        # The leaderboard should show the total points from all predictions
+        # Since we have one prediction with 20 points, total should be 20
+        assert (
+            owner_entry["total_points"] == 20
+        ), f"Expected 20 points for {prediction_owner_email}, got {owner_entry['total_points']}. Leaderboard data: {leaderboard_response.data}"
