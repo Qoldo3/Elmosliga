@@ -1,5 +1,6 @@
 Django
 django-cors-headers
+corsheaders
 Pillow
 python-dotenv
 djangorestframework
