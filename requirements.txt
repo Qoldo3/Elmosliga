@@ -9,8 +9,3 @@ python-decouple
 djoser
 gunicorn
 
-# Testing dependencies
-pytest
-pytest-django
-pytest-cov
-factory-boy
