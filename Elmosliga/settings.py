@@ -31,7 +31,8 @@ SECRET_KEY = os.getenv("DJANGO_SECRET_KEY")
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = os.getenv("DJANGO_DEBUG") == "True"
 
-ALLOWED_HOSTS = os.getenv("DJANGO_ALLOWED_HOSTS", "").split(",")
+ALLOWED_HOSTS = ['https://senamir.runflare.run',
+                 'https://elmosliga.runflare.run']
 
 
 # Application definition
@@ -162,7 +163,10 @@ EMAIL_HOST_PASSWORD = os.getenv("EMAIL_HOST_PASSWORD")
 
 DEFAULT_FROM_EMAIL = "Elmosliga <amirmybb@gmail.com>"
 
-CORS_ALLOWED_ORIGINS = os.getenv("CORS_ALLOWED_ORIGINS", "https://elmosliga.runflare.run")
+CORS_ALLOWED_ORIGINS = [
+    'https://senamir.runflare.run',
+    'https://elmosliga.runflare.run'
+]
 
 # Frontend URL for redirects
 FRONTEND_URL = os.getenv("FRONTEND_URL", "https://elmosliga.runflare.run")
