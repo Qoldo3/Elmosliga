@@ -8,4 +8,4 @@ services:
       - .env
     volumes:
       - .:/Elmosliga
-    command: python manage.py runserver 0.0.0.0:8000
+    command: gunicorn Elmosliga.wsgi:application --bind 0.0.0.0:$PORT --workers 2
