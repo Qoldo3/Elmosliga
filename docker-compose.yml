@@ -1,11 +1,9 @@
 services:
   web:
     build: .
-    container_name: elmosliga-web
+    container_name: Elmosliga
     ports:
-      - "8000:8000"
+      - "80:8000"
     env_file:
       - .env
-    volumes:
-      - .:/Elmosliga
     command: gunicorn Elmosliga.wsgi:application --bind 0.0.0.0:8000 --workers 2
