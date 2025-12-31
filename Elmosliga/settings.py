@@ -44,6 +44,7 @@ INSTALLED_APPS = [
     "django.contrib.messages",
     "django.contrib.staticfiles",
     "django-cors-headers",
+    "corsheaders",
     "accounts",
     "League",
     "rest_framework",
