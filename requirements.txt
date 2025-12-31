@@ -7,7 +7,6 @@ djangorestframework-simplejwt
 django-mail-templated
 python-decouple
 djoser
-uwsgi
 gunicorn
 
 # Testing dependencies
